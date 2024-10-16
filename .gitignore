@@ -152,3 +152,9 @@ dist
 node_modules
 .vscode-test/
 *.vsix
+
+# ts build artifacts
+src/*.js
+src/*.js.map
+src/test/*.js
+src/test/*.js.map
