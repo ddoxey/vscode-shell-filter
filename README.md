@@ -1,3 +1,5 @@
+![Shell Filter](https://raw.githubusercontent.com/ddoxey/vscode-shell-filter/main/image/icon.png)
+
 # vscode-shell-filter
 VSCode extension allows for filtering highlighted text with a shell command.
 
