@@ -1,49 +1,47 @@
 import * as vscode from 'vscode';
 import { exec } from 'child_process';
+import { loadHistory, saveHistory, updateCommandHistory } from './history';
 
-// Array to hold recent shell commands in memory
-let recentCommands: string[] = [];
+// Load the persistent command history from file
+let commandHistory = loadHistory();
 
 // Function to activate the extension
 export function activate(context: vscode.ExtensionContext) {
     let disposable = vscode.commands.registerCommand('shellfilter.runCustomShellCommand', async () => {
         const editor = vscode.window.activeTextEditor;
-        if (editor) {
-            const selection = editor.selection;
-            const text = editor.document.getText(selection);
+        if (!editor) { return; }
 
-            if (!text) {
-                vscode.window.showErrorMessage('No text selected.');
-                return;
-            }
+        const selection = editor.selection;
+        const text = editor.document.getText(selection);
 
-            // Show the Quick Pick menu for recent commands or input a new one
-            const selectedCommand = await promptUserForCommand();
-            
-            if (!selectedCommand) {
-                vscode.window.showErrorMessage('No command selected or entered.');
-                return;
-            }
-
-            // Call the function to run the shell command
-            try {
-                const result = await runShellCommand(selectedCommand, text);
-                // Replace the selected text with the result
-                editor.edit(editBuilder => {
-                    editBuilder.replace(selection, result);
-                });
-
-                // Store the command in recent history (avoid duplicates)
-                if (!recentCommands.includes(selectedCommand)) {
-                    recentCommands.unshift(selectedCommand);  // Add to the front of the list
-                    if (recentCommands.length > 10) {
-                        recentCommands.pop();  // Limit to the last 10 commands
-                    }
-                }
-            } catch (error) {
-                vscode.window.showErrorMessage(`Error: ${error}`);
-            }
+        if (!text) {
+            vscode.window.showErrorMessage('No text selected.');
+            return;
         }
+
+        // Show the Quick Pick menu for recent commands or input a new one
+        const selectedCommand = await promptUserForCommand();
+
+        if (!selectedCommand) {
+            vscode.window.showErrorMessage('No command selected or entered.');
+            return;
+        }
+
+        // Call the function to run the shell command
+        try {
+            const result = await runShellCommand(selectedCommand, text);
+            // Replace the selected text with the result
+            editor.edit(editBuilder => {
+                editBuilder.replace(selection, result);
+            });
+        } catch (error) {
+            vscode.window.showErrorMessage(`Error: ${error}`);
+            return;
+        }
+
+        // Update the history with the succesful command
+        updateCommandHistory(commandHistory, selectedCommand);
+        saveHistory(commandHistory);  // Save updated history
     });
 
     context.subscriptions.push(disposable);
@@ -51,17 +49,17 @@ export function activate(context: vscode.ExtensionContext) {
 
 async function promptUserForCommand(): Promise<string | undefined> {
     // Check if there is history; if not, prompt for a new command immediately
-    if (recentCommands.length === 0) {
+    if (commandHistory.length === 0) {
         return await vscode.window.showInputBox({
             prompt: 'No history available. Enter your first shell command',
             placeHolder: 'e.g., grep -v foobar'
         });
     }
 
-    // Define quick pick items with correct type
-    const quickPickItems: vscode.QuickPickItem[] = recentCommands.map(cmd => ({
-        label: cmd,
-        description: ''  // Empty description if not used
+    // Define quick pick items from command history
+    const quickPickItems: vscode.QuickPickItem[] = commandHistory.map(cmd => ({
+        label: cmd.command,
+        description: ''
     }));
 
     quickPickItems.push({
@@ -84,13 +82,13 @@ async function promptUserForCommand(): Promise<string | undefined> {
             prompt: 'Enter a shell command to run',
             placeHolder: 'e.g., grep -v foobar'
         });
-    } else {
-        // Pre-fill Input Box with the selected command for modification
-        return await vscode.window.showInputBox({
-            prompt: 'Modify the command before executing',
-            value: pickedItem.label  // Pre-fill with the selected command from history
-        });
     }
+
+    // Pre-fill Input Box with the selected command for modification
+    return await vscode.window.showInputBox({
+        prompt: 'Modify the command before executing',
+        value: pickedItem.label  // Pre-fill with the selected command from history
+    });
 }
 
 // Function to run the shell command and return the output
