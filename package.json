@@ -3,6 +3,7 @@
   "displayName": "Shell Filter",
   "description": "Apply selected text as STDIN to a shell command",
   "version": "1.0.1",
+  "publisher": "Dylan Doxey",
   "icon": "image/icon.png",
   "repository": {
     "type": "git",
